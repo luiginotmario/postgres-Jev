@@ -26,22 +26,22 @@ Open http://localhost:4317.
 
 ## Search
 
-Set `TYPESAFE_API_KEY` in `.env` and restart for arbitrary natural-language queries using Jev. Keys stay server-side. Requests evaluate rows independently with eight concurrent workers, retry rate limits twice, and cache successful probabilities by record contents, question, model, and instructions. Results use a 70% cutoff.
+Set `OPENROUTER_API_KEY` in `.env` and restart for arbitrary natural-language queries using Jev Latest through OpenRouter (`~typesafe/jev-latest`). The adapter uses OpenRouter’s [native Decisions API](https://openrouter.ai/openapi.json), preserving Jev’s typed probability output. Set `OPENROUTER_MODEL` to pin a specific version if needed. Keys stay server-side. Requests evaluate rows independently with eight concurrent workers, retry rate limits twice, and cache successful probabilities by record contents, question, model, and instructions. Results use a 70% cutoff.
 
 Without a key, the UI displays `Demo`. Only offline example rules work. The input placeholder shows a supported question, and unsupported questions explain the limitation. These scores are not model predictions.
 
 Examples:
 
-| Dataset | Query |
-| --- | --- |
-| People | Could work from home |
-| People | People who know SQL |
-| Countries | Landlocked countries |
-| Countries | Places where people speak Spanish |
-| Sensor readings | Low battery and high temperature |
-| Sensor readings | Offline sensors |
+| Dataset         | Query                             |
+| --------------- | --------------------------------- |
+| People          | Could work from home              |
+| People          | People who know SQL               |
+| Countries       | Landlocked countries              |
+| Countries       | Places where people speak Spanish |
+| Sensor readings | Low battery and high temperature  |
+| Sensor readings | Offline sensors                   |
 
-This is a local prototype bound to loopback. There are no external database connection controls or endpoints.
+Locally the server binds to loopback. On Render it binds to all interfaces and accepts same-origin requests from `RENDER_EXTERNAL_URL`. For a custom domain, set `APP_ORIGIN` to the public origin (overrides the Render URL). There are no external database connection controls or endpoints.
 
 ## Validate
 
@@ -52,3 +52,7 @@ npm start
 ```
 
 The build includes strict TypeScript checks. Tests cover generated schemas, dataset switching, numeric predicates, output validation, caching, request concurrency, and retry behavior. Live inference requires a configured key.
+
+## Render
+
+Use `npm ci && npm run build` as the build command and `npm start` as the start command. Set `OPENROUTER_API_KEY` in the service environment; keep it out of source control. `OPENROUTER_MODEL` defaults to `~typesafe/jev-latest`.

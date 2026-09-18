@@ -43,7 +43,7 @@ export function parseProbability(body: ResponseBody): number {
 
 export function createJudge({
   apiKey,
-  model = "jev-latest",
+  model = "~typesafe/jev-latest",
   fetcher = fetch,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   maxEntries = 10000,
@@ -62,19 +62,22 @@ export function createJudge({
       throw new Error("A server API key is required for live search.");
 
     for (let attempt = 0; attempt < 3; attempt++) {
-      const response = await fetcher("https://api.typesafe.ai/v1/systemone", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
+      const response = await fetcher(
+        "https://openrouter.ai/api/alpha/decisions",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            state: { record: row, query },
+            questions: { match: { type: "noul", instructions: instruction } },
+          }),
+          signal: AbortSignal.timeout(20000),
         },
-        body: JSON.stringify({
-          model,
-          state: { record: row, query },
-          questions: { match: { type: "noul", instructions: instruction } },
-        }),
-        signal: AbortSignal.timeout(20000),
-      });
+      );
       if ([429, 529].includes(response.status) && attempt < 2) {
         await sleep(400 * 2 ** attempt);
         continue;

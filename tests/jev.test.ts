@@ -8,6 +8,32 @@ const response = (probability = 0.9) =>
     { headers: { "Content-Type": "application/json" } },
   );
 
+test("uses OpenRouter Decisions with Jev Latest and typed questions", async () => {
+  const row = { id: 1, job: "Software engineer" };
+  const judge = createJudge({
+    apiKey: "test-key",
+    fetcher: async (url, options) => {
+      assert.equal(url, "https://openrouter.ai/api/alpha/decisions");
+      assert.equal(options?.method, "POST");
+      assert.equal(
+        new Headers(options?.headers).get("Authorization"),
+        "Bearer test-key",
+      );
+      const body = JSON.parse(String(options?.body));
+      assert.equal(body.model, "~typesafe/jev-latest");
+      assert.deepEqual(body.state, {
+        record: row,
+        query: "could work from home",
+      });
+      assert.equal(body.questions.match.type, "noul");
+      assert.equal(typeof body.questions.match.instructions, "string");
+      return response(0.95);
+    },
+  });
+  const result = await judge.search([row], "could work from home");
+  assert.equal(result[0].probability, 0.95);
+});
+
 test("model output must be a valid probability", () => {
   assert.equal(
     parseProbability({ answers: { match: { type: "noul", noul: 0 } } }),

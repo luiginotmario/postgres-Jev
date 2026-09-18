@@ -17,7 +17,13 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 if (existsSync(path.join(root, ".env")))
   process.loadEnvFile(path.join(root, ".env"));
 const port = Number(process.env.PORT || 4317);
-const live = Boolean(process.env.TYPESAFE_API_KEY);
+const live = Boolean(process.env.OPENROUTER_API_KEY);
+const publicUrl = process.env.APP_ORIGIN || process.env.RENDER_EXTERNAL_URL;
+const allowedOrigins = [
+  `http://localhost:${port}`,
+  `http://127.0.0.1:${port}`,
+  ...(publicUrl ? [new URL(publicUrl).origin] : []),
+];
 const app = express();
 
 interface Session {
@@ -33,11 +39,10 @@ app.disable("x-powered-by");
 app.use(express.json({ limit: "8kb" }));
 app.use("/api", (request, response, next) => {
   response.set("Cache-Control", "no-store");
-  const origins = [`http://localhost:${port}`, `http://127.0.0.1:${port}`];
   if (
     request.method !== "GET" &&
     request.headers.origin &&
-    !origins.includes(request.headers.origin)
+    !allowedOrigins.includes(request.headers.origin)
   ) {
     response
       .status(403)
@@ -66,13 +71,14 @@ function getSession(request: Request, response: Response): Session {
     busy: false,
     dataset: generateDataset("people", live),
     judge: createJudge({
-      apiKey: process.env.TYPESAFE_API_KEY,
-      model: process.env.TYPESAFE_MODEL || "jev-latest",
+      apiKey: process.env.OPENROUTER_API_KEY,
+      model: process.env.OPENROUTER_MODEL || "~typesafe/jev-latest",
     }),
   };
   sessions.set(id, session);
   response.cookie("jev_session", id, {
     httpOnly: true,
+    secure: publicUrl?.startsWith("https://") ?? false,
     sameSite: "strict",
     maxAge: sessionLifetime,
   });
@@ -136,14 +142,10 @@ app.post("/api/search", async (request, response) => {
       try {
         results = scoreDemo(session.dataset, query);
       } catch (error) {
-        response
-          .status(422)
-          .json({
-            error:
-              error instanceof Error
-                ? error.message
-                : "Unsupported demo query.",
-          });
+        response.status(422).json({
+          error:
+            error instanceof Error ? error.message : "Unsupported demo query.",
+        });
         return;
       }
     }
@@ -179,14 +181,12 @@ if (process.env.NODE_ENV === "production") {
   const entry = manifest["src/main.tsx"];
   app.use(express.static(path.join(root, "dist")));
   app.get("/", (_request, response) => {
-    response
-      .type("html")
-      .send(
-        renderDocument({
-          script: `/${entry.file}`,
-          styles: entry.css?.map((file) => `/${file}`),
-        }),
-      );
+    response.type("html").send(
+      renderDocument({
+        script: `/${entry.file}`,
+        styles: entry.css?.map((file) => `/${file}`),
+      }),
+    );
   });
 } else {
   const vite = await createServer({
@@ -202,7 +202,7 @@ if (process.env.NODE_ENV === "production") {
   app.use(vite.middlewares);
 }
 
-const server = app.listen(port, "127.0.0.1");
+const server = app.listen(port, process.env.RENDER ? "0.0.0.0" : "127.0.0.1");
 server.on("listening", () => console.log(`http://localhost:${port}`));
 server.on("error", (error) => {
   console.error(error.message);
