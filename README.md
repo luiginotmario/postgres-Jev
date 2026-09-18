@@ -1,18 +1,15 @@
-# Search playground
+# postgres-Jev
 
-A search input, a results table, and a button to generate a different dataset.
+Natural-language predicates for PostgreSQL using Jev through OpenRouter. The TypeScript/Tailwind dashboard is a playground for the same row judgments.
 
-## Stack
+```sql
+SELECT * FROM people p
+WHERE jev(p, 'could explain a technical product to a beginner');
+```
 
-- React with TypeScript and Tailwind CSS 4
-- TypeScript server, data generator, model adapter, and tests
-- Vite builds typed React source; the document is rendered from TSX
+See [extension setup and SQL examples](extension/README.md). For fast searches, `jev_prepare()` batches the selected candidate rows before the `WHERE jev(...)` scan. A bare scalar call evaluates uncached rows individually; it does not silently scan unrelated table rows.
 
-No handwritten JavaScript, Java, Python, or standalone HTML source files. The earlier experimental database extension was removed in favor of the requested TypeScript-only application.
-
-## Run
-
-Node.js 20.14 or newer:
+## Run the dashboard
 
 ```sh
 npm install
@@ -20,43 +17,34 @@ cp .env.example .env
 npm run dev
 ```
 
-Open http://localhost:4317.
+Set `OPENROUTER_API_KEY` in `.env`. Open http://localhost:4317. The model defaults to `~typesafe/jev-latest`. Keys stay server-side.
 
-`Generate random database` switches between fictional people, curated country samples, and synthetic sensor measurements. Generation runs directly in TypeScript. Datasets are signed with a one-hour expiry and sent back with searches, so they survive serverless instance changes.
+- With `DATABASE_URL` pointing to PostgreSQL with Jev installed, the demo sends candidate rows to `jev_evaluate()` in PostgreSQL and executes a real `WHERE jev(...)` query over those judgments. PostgreSQL calls OpenRouter.
+- Without `DATABASE_URL`, the dashboard calls the same model from TypeScript. This keeps the hosted demo usable without a database.
+- Without an OpenRouter key, only the limited offline example rules work, marked Demo.
 
-## Search
+The local demo database is optional. Docker is only one way to run PostgreSQL, not a frontend dependency.
 
-Set `OPENROUTER_API_KEY` in `.env` and restart for arbitrary natural-language queries using Jev Latest through OpenRouter (`~typesafe/jev-latest`). The adapter uses OpenRouter’s [native Decisions API](https://openrouter.ai/openapi.json), preserving Jev’s typed probability output. Set `OPENROUTER_MODEL` to pin a specific version if needed. Keys stay server-side. Rows are submitted as independent `noul` questions in native Jev batches (up to 128 questions and 96 KB of question text per call, with at most four calls in flight). Each question contains only its own record; the query is shared state. Requests retry rate limits twice and cache successful probabilities by record contents, question, model, and instructions. Caches are held in instance memory and can reset on Vercel cold starts or instance changes. Results use a 70% cutoff.
+Generated datasets include fictional people with contrasting experience and constraints, geographic descriptions, and sensor readings whose meaning depends on operating context. Example prompts demonstrate semantic judgments rather than simple keyword matching. The model remains probabilistic; SQL should handle exact conditions and arithmetic.
 
-Without a key, the UI displays `Demo`. Only offline example rules work. The input placeholder shows a supported question, and unsupported questions explain the limitation. These scores are not model predictions.
+## Connect Supabase locally
 
-Examples:
+Click **Connect Supabase** and supply only your project URL and API key. The local server discovers readable tables/views exposed in the project's **public Data API schema**, fetches their rows, and refreshes them on every search. Results show the source table and full record. The key must permit schema discovery and table reads; hidden schemas/tables cannot be discovered. Some projects require a privileged key for schema discovery; keys with elevated privileges can bypass RLS.
 
-| Dataset         | Query                             |
-| --------------- | --------------------------------- |
-| People          | Could work from home              |
-| People          | People who know SQL               |
-| Countries       | Landlocked countries              |
-| Countries       | Places where people speak Spanish |
-| Sensor readings | Low battery and high temperature  |
-| Sensor readings | Offline sensors                   |
+The demo loads up to 500 rows shared across discovered tables, with at most 100 tables and 500 KB of record data. It reports when table samples are capped; it does not claim to scan every row in a large database. Connections are read-only. Credentials stay in the local session memory until disconnect, restart, or expiry. Loaded records are sent to OpenRouter when searched. The public hosted demo does not accept database credentials; its connection button links to local setup.
 
-Locally the server binds to loopback. On Render it binds to all interfaces and accepts same-origin requests from `RENDER_EXTERNAL_URL`. For a custom domain, set `APP_ORIGIN` to the public origin (overrides the Render URL). There are no external database connection controls or endpoints.
+A Supabase URL/key does not install SQL functions. To run `WHERE jev(...)` directly in your own database, follow the extension setup separately.
 
-## Validate
+## Validation
 
 ```sh
 npm test
 npm run build
-npm start
+TEST_DATABASE_URL=postgresql://... npm run test:extension
 ```
 
-The build includes strict TypeScript checks. Tests cover generated schemas, dataset switching, numeric predicates, output validation, caching, request concurrency, and retry behavior. Live inference requires a configured key.
-
-## Render
-
-Use `npm ci && npm run build` as the build command and `npm start` as the start command. Set `OPENROUTER_API_KEY` in the service environment; keep it out of source control. `OPENROUTER_MODEL` defaults to `~typesafe/jev-latest`.
+Application code uses TypeScript/TSX and Tailwind. The extension uses SQL/PLpgSQL. JavaScript and HTML outputs are generated build artifacts. See [validation results](VALIDATION.md).
 
 ## Vercel
 
-Deploy with `vercel --prod`. The `api/index.ts` function serves the Express API and TSX-rendered page; Vite assets are served statically. Set `OPENROUTER_API_KEY` as a sensitive production environment variable and `OPENROUTER_MODEL` to `~typesafe/jev-latest`. Deployment hostnames are allowed automatically; use `APP_ORIGIN` for a custom domain. `.vercelignore` excludes local environment files from uploads.
+Deploy with `vercel --prod`. Set `OPENROUTER_API_KEY` as a sensitive production environment variable. Set `DATABASE_URL` only if a reachable database with Jev installed is available. Local environment files are excluded from uploads. Cache state is local to each application instance or PostgreSQL connection, respectively, and can reset when those restart.

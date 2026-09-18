@@ -1,0 +1,5 @@
+comment = 'Semantic PostgreSQL predicates using Jev through OpenRouter'
+default_version = '0.1.0'
+relocatable = false
+schema = 'public'
+requires = 'http'

@@ -11,62 +11,8 @@ const shuffle = <T>(values: readonly T[]): T[] => {
   return result;
 };
 
-const roles = [
-  [
-    "Product designer",
-    "Remote",
-    "Figma, prototypes, design systems",
-    "Designs digital products with a distributed team.",
-  ],
-  [
-    "Software engineer",
-    "Remote",
-    "TypeScript, React, SQL",
-    "Builds developer tools. Previously worked at a startup.",
-  ],
-  [
-    "Architect",
-    "On-site",
-    "AutoCAD, sustainable design",
-    "Designs buildings and visits construction sites.",
-  ],
-  [
-    "Content strategist",
-    "Remote",
-    "Writing, SEO, storytelling",
-    "Turns technical ideas into stories across time zones.",
-  ],
-  [
-    "Registered nurse",
-    "On-site",
-    "Patient care, clinical practice",
-    "Provides hands-on care at a community hospital.",
-  ],
-  [
-    "Data analyst",
-    "Hybrid",
-    "SQL, Python, statistics",
-    "Finds patterns in data for climate technology teams.",
-  ],
-  [
-    "Head chef",
-    "On-site",
-    "Cooking, team leadership",
-    "Runs a neighborhood restaurant using seasonal ingredients.",
-  ],
-  [
-    "Illustrator",
-    "Remote",
-    "Illustration, visual storytelling",
-    "Creates editorial illustrations from a home studio.",
-  ],
-  [
-    "Product manager",
-    "Hybrid",
-    "Research, B2B SaaS, roadmaps",
-    "Leads a software team. Former startup founder.",
-  ],
-] as const;
+import { peopleProfiles, careerNotes } from "./people-profiles.js";
+import { sensorScenarios } from "./sensor-scenarios.js";
 
 const countryReference = [
   [
@@ -81,14 +27,14 @@ const countryReference = [
     "Asia",
     "Tokyo",
     "Japanese",
-    "Pacific island nation with mountains and a temperate climate.",
+    "Pacific island nation with steep mountains. Coastal access does not mean year-round beach weather; conditions vary strongly by season and latitude.",
   ],
   [
     "Canada",
     "North America",
     "Ottawa",
     "English, French",
-    "Atlantic and Pacific coasts, cold winters, forests and lakes.",
+    "Atlantic and Pacific coasts, cold winters, forests and lakes. Plenty of coastline, but a poor match for someone who assumes an ocean holiday must be tropical.",
   ],
   [
     "Brazil",
@@ -109,7 +55,7 @@ const countryReference = [
     "Europe",
     "Bern",
     "German, French, Italian, Romansh",
-    "Landlocked, alpine mountains and cold winters.",
+    "Alpine mountains and lakes with cold winters. Lakeside swimming is possible, but this landlocked country has no sea coast.",
   ],
   [
     "Kenya",
@@ -123,14 +69,14 @@ const countryReference = [
     "Oceania",
     "Canberra",
     "English",
-    "Extensive coastlines and a desert interior.",
+    "Extensive coastlines, a dry interior and major regional climate differences. Tropical northern areas contrast with temperate southern cities; a single national climate label is misleading.",
   ],
   [
     "Iceland",
     "Europe",
     "Reykjavík",
     "Icelandic",
-    "North Atlantic island, cold climate and volcanoes.",
+    "North Atlantic island with volcanoes, glaciers and geothermal pools. Outdoor hot-water bathing is possible despite the cold climate; that is different from tropical beach weather.",
   ],
   [
     "Mexico",
@@ -172,7 +118,7 @@ const countryReference = [
     "Europe",
     "Oslo",
     "Norwegian",
-    "North Atlantic coast, fjords and cold winters.",
+    "North Atlantic coast, deep fjords and mountains, with cold winters. Well suited to dramatic coastal scenery, but ocean access alone does not make it a warm beach destination.",
   ],
   [
     "Thailand",
@@ -186,7 +132,7 @@ const countryReference = [
     "South America",
     "Santiago",
     "Spanish",
-    "Long Pacific coast, Andes mountains and desert.",
+    "A long Pacific coastline beside the Andes. The dry northern desert and the cold southern fjords offer very different trips; coastal does not necessarily mean warm water.",
   ],
   [
     "Italy",
@@ -228,7 +174,7 @@ const countryReference = [
     "South America",
     "Lima",
     "Spanish, Quechua, Aymara",
-    "Pacific coast, Andes mountains and Amazon rainforest.",
+    "Pacific coast, high Andes and Amazon rainforest. The coastal desert can be cool and foggy while the eastern lowlands are tropical; the climate depends on the region.",
   ],
   [
     "Austria",
@@ -277,13 +223,20 @@ function generatePeople(): DataRow[] {
   const names = shuffle(
     firstNames.flatMap((first) => lastNames.map((last) => `${first} ${last}`)),
   );
-  return names.slice(0, randomInt(80, 130)).map((name, index) => {
-    const [job_title, work_mode, skills, description] = pick(roles);
+  const profiles = shuffle(peopleProfiles);
+  return names.slice(0, randomInt(96, 130)).map((name, index) => {
+    const [job_title, work_mode, skills, context] =
+      profiles[index % profiles.length];
+    const description =
+      context +
+      " " +
+      careerNotes[
+        (Math.floor(index / profiles.length) + index) % careerNotes.length
+      ];
     return {
       id: index + 1,
       name,
       job_title,
-      country: pick(countryReference)[0],
       work_mode,
       skills,
       description,
@@ -305,33 +258,36 @@ function generateCountries(): DataRow[] {
 }
 
 function generateNumbers(): DataRow[] {
-  return Array.from({ length: randomInt(50, 101) }, (_, index) => ({
-    id: index + 1,
-    sensor: `SEN-${String(index + 1).padStart(3, "0")}`,
-    location: pick([
-      "Greenhouse",
-      "Server room",
-      "Cold storage",
-      "Workshop",
-      "Office",
-      "Warehouse",
-    ]),
-    temperature_c: randomInt(-15, 56),
-    humidity_pct: randomInt(10, 96),
-    battery_pct: randomInt(1, 101),
-    status: pick(["Online", "Online", "Online", "Offline", "Maintenance"]),
-  }));
+  const scenarios = shuffle(sensorScenarios);
+  return Array.from({ length: randomInt(54, 91) }, (_, index) => {
+    const [location, temperature_c, humidity_pct, battery_pct, status, notes] =
+      scenarios[index % scenarios.length];
+    return {
+      id: index + 1,
+      sensor: "SEN-" + String(index + 1).padStart(3, "0"),
+      location:
+        location +
+        " · " +
+        ["North", "South", "East", "West", "Central"][
+          Math.floor(index / scenarios.length)
+        ],
+      temperature_c,
+      humidity_pct,
+      battery_pct,
+      status,
+      notes,
+    };
+  });
 }
-
 const definitions = {
   people: {
     title: "People",
     columns: [
       ["name", "Name"],
       ["job_title", "Job title"],
-      ["country", "Country"],
       ["work_mode", "Work mode"],
-      ["description", "Description"],
+      ["skills", "Skills"],
+      ["description", "Background & constraints"],
     ],
     examples: [
       "Could work from home",
@@ -365,6 +321,7 @@ const definitions = {
       ["humidity_pct", "Humidity"],
       ["battery_pct", "Battery"],
       ["status", "Status"],
+      ["notes", "Operating context"],
     ],
     examples: [
       "Sensors that might need attention",
@@ -383,13 +340,35 @@ const definitions = {
   }
 >;
 
+const semanticExamples: Record<DatasetKind, string[]> = {
+  people: [
+    "Could explain a technical product to a customer who is not technical",
+    "Can work entirely from home, even if their job title suggests otherwise",
+    "Have actually queried databases, not just recruited people who do",
+    "Have operated in an early-stage company without a playbook",
+    "Could help a confused customer and also investigate the technical cause",
+    "Can coach people but do not want to manage a team",
+  ],
+  countries: [
+    "Places with both mountains and access to the sea",
+    "Somewhere for a beach trip rather than a cold-weather holiday",
+    "Countries where a Spanish speaker could communicate and also visit mountains",
+  ],
+  numbers: [
+    "Needs intervention, excluding planned tests and issues already resolved",
+    "Looks alarming from the numbers but is actually expected in context",
+    "Could lose monitoring soon unless someone visits the site",
+    "Temperature is unsafe for what is stored there, even if it feels cold",
+  ],
+};
+
 export function generateDataset(kind: DatasetKind, live = false): Dataset {
   const definition = definitions[kind];
   return {
     kind,
     title: definition.title,
     columns: definition.columns.map(([key, label]) => ({ key, label })),
-    examples: definition.examples,
+    examples: live ? semanticExamples[kind] : definition.examples,
     rows: definition.generate(),
     version: randomUUID(),
     live,

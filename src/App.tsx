@@ -8,6 +8,7 @@ import {
   Shuffle,
   X,
 } from "lucide-react";
+import { SupabaseConnect } from "./SupabaseConnect";
 import { api } from "./api";
 import type { DataRow, Dataset, SearchResult } from "./types";
 
@@ -33,7 +34,9 @@ export function App() {
   const [dataset, setDataset] = useState<Dataset | null>(null);
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<SearchResult | null>(null);
-  const [busy, setBusy] = useState<"search" | "generate" | null>(null);
+  const [busy, setBusy] = useState<"search" | "generate" | "connect" | null>(
+    null,
+  );
   const [error, setError] = useState("");
   const [page, setPage] = useState(0);
   const input = useRef<HTMLInputElement>(null);
@@ -70,13 +73,14 @@ export function App() {
     setBusy("search");
     setError("");
     try {
-      setResult(
-        await api<SearchResult>("search", {
-          query,
-          version: dataset.version,
-          datasetToken: dataset.token,
-        }),
-      );
+      const response = await api<SearchResult>("search", {
+        query,
+        version: dataset.version,
+        datasetToken: dataset.token,
+        source: dataset.source?.type,
+      });
+      setResult(response);
+      if (response.dataset) setDataset(response.dataset);
       setPage(0);
     } catch (error) {
       setError(error instanceof Error ? error.message : "Search failed.");
@@ -126,6 +130,29 @@ export function App() {
           <code className="text-xs text-sage-700">jev()</code>.
         </p>
       </header>
+      <SupabaseConnect
+        allowed={dataset?.localConnections ?? false}
+        busy={!!busy || !dataset}
+        connected={!!dataset?.source}
+        onBusy={(value) => setBusy(value ? "connect" : null)}
+        onConnected={(value) => {
+          setDataset(value);
+          setResult(null);
+          setQuery("");
+          setError("");
+          setPage(0);
+        }}
+      />
+      {dataset?.source && (
+        <p className="mb-3 text-xs text-sage-500">
+          {dataset.title} · {dataset.source.tables.length} tables · up to{" "}
+          {dataset.source.limit} rows · refreshed on every search
+          {dataset.source.capped ? " · Showing a capped subset per table" : ""}
+          {dataset.rows.length === 0
+            ? " · No visible rows: check SELECT/RLS policies or the table contents."
+            : ""}
+        </p>
+      )}
       <form
         onSubmit={search}
         className="mb-3 flex items-center gap-3 rounded-lg border border-sage-300 bg-white p-3 pl-4 shadow-xs focus-within:border-sage-500 sm:pl-5"
@@ -184,14 +211,33 @@ export function App() {
           >
             <span className="text-sage-700">jev</span>
             {"(" +
-              dataset.kind +
+              (dataset.source ? "database" : dataset.kind) +
               ", " +
               JSON.stringify(query.trim() || dataset.examples[0]) +
               ")"}
           </code>
-          <span className="shrink-0 text-[11px]">
-            {dataset.live ? "Jev Latest · noul" : "Demo"}
-          </span>
+        </div>
+      )}
+
+      {dataset?.live && !dataset.source && (
+        <div
+          className="mb-5 flex flex-wrap gap-2"
+          aria-label="Example searches"
+        >
+          {dataset.examples.slice(0, 3).map((example) => (
+            <button
+              key={example}
+              type="button"
+              disabled={!!busy}
+              onClick={() => {
+                setQuery(example);
+                input.current?.focus();
+              }}
+              className="rounded-md border border-sage-200 bg-sage-50 px-2.5 py-1.5 text-left text-[11px] leading-relaxed text-sage-600 transition-colors hover:border-sage-400 hover:bg-sage-100 disabled:opacity-40"
+            >
+              {example}
+            </button>
+          ))}
         </div>
       )}
 
@@ -267,7 +313,7 @@ export function App() {
                   {dataset?.columns.map((column, index) => (
                     <td
                       key={column.key}
-                      className={`px-4 py-3.5 leading-relaxed ${index === 0 ? "font-medium text-sage-800" : "text-sage-500"} ${column.key === "description" ? "min-w-64 max-w-sm" : "whitespace-nowrap"}`}
+                      className={`px-4 py-3.5 leading-relaxed ${index === 0 ? "font-medium text-sage-800" : "text-sage-500"} ${!!dataset?.source || ["description", "notes", "skills"].includes(column.key) ? "min-w-56 max-w-sm" : "whitespace-nowrap"}`}
                     >
                       {column.key === "name" ? (
                         <span className="inline-flex items-center gap-2.5">
@@ -275,7 +321,14 @@ export function App() {
                             aria-hidden="true"
                             className={
                               "inline-flex size-7 shrink-0 items-center justify-center rounded-full text-[9px] font-normal " +
-                              avatarColors[row.id % avatarColors.length]
+                              avatarColors[
+                                String(row.id)
+                                  .split("")
+                                  .reduce(
+                                    (sum, char) => sum + char.charCodeAt(0),
+                                    0,
+                                  ) % avatarColors.length
+                              ]
                             }
                           >
                             {String(row.name)
@@ -361,7 +414,11 @@ export function App() {
         ) : (
           <Shuffle size={14} />
         )}
-        {busy === "generate" ? "Generating…" : "Generate random database"}
+        {busy === "generate"
+          ? "Generating…"
+          : dataset?.source
+            ? "Disconnect & use demo data"
+            : "Generate random database"}
       </button>
     </main>
   );

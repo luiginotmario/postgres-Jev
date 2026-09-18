@@ -11,6 +11,12 @@ import type { Manifest } from "vite";
 import { datasetTokens } from "./dataset-token.js";
 import { generateDataset, nextDataset, scoreDemo } from "./datasets.js";
 import { renderDocument } from "./document.js";
+import {
+  connectionInput,
+  readSupabase,
+  type SupabaseConnection,
+} from "./supabase.js";
+import { postgresEnabled, searchPostgres } from "./postgres-jev.js";
 import { createJudge } from "./jev.js";
 import type { Dataset, Judgment } from "../src/types.js";
 
@@ -35,7 +41,11 @@ const tokens = datasetTokens(
   process.env.OPENROUTER_API_KEY || randomBytes(32).toString("hex"),
 );
 
+const localConnections =
+  !process.env.VERCEL && !process.env.RENDER && !publicUrl;
+
 interface Session {
+  connection?: SupabaseConnection;
   expires: number;
   busy: boolean;
   dataset: Dataset;
@@ -102,9 +112,55 @@ function getSession(request: Request, response: Response): Session {
   return session;
 }
 
+function publicDataset(dataset: Dataset): Dataset {
+  return {
+    ...dataset,
+    localConnections,
+    engine: postgresEnabled() ? "postgres" : "application",
+    token: dataset.source ? undefined : tokens.encode(dataset),
+  };
+}
+
+app.post("/api/supabase/connect", async (request, response) => {
+  if (
+    !localConnections ||
+    !["localhost", "127.0.0.1", "[::1]"].includes(request.hostname)
+  ) {
+    response.status(403).json({
+      error: "Run this app locally to connect your own Supabase project.",
+    });
+    return;
+  }
+  if (!live) {
+    response.status(400).json({
+      error:
+        "Set OPENROUTER_API_KEY in your local .env and restart before connecting.",
+    });
+    return;
+  }
+  const session = getSession(request, response);
+  if (session.busy) {
+    response
+      .status(429)
+      .json({ error: "Let the current search finish first." });
+    return;
+  }
+  session.busy = true;
+  try {
+    const connection = connectionInput(request.body);
+    const dataset = await readSupabase(connection);
+    session.connection = connection;
+    session.dataset = dataset;
+    session.judge.clear();
+    response.json(publicDataset(dataset));
+  } finally {
+    session.busy = false;
+  }
+});
+
 app.get("/api/dataset", (request, response) => {
   const dataset = getSession(request, response).dataset;
-  response.json({ ...dataset, token: tokens.encode(dataset) });
+  response.json(publicDataset(dataset));
 });
 
 app.post("/api/generate", (request, response) => {
@@ -115,15 +171,17 @@ app.post("/api/generate", (request, response) => {
       .json({ error: "Let the current search finish first." });
     return;
   }
+  session.connection = undefined;
   session.dataset = nextDataset(session.dataset.kind, live);
   session.judge.clear();
-  response.json({ ...session.dataset, token: tokens.encode(session.dataset) });
+  response.json(publicDataset(session.dataset));
 });
 
 app.post("/api/search", async (request, response) => {
-  const { query, version } = request.body as {
+  const { query, version, source } = request.body as {
     query?: unknown;
     version?: unknown;
+    source?: unknown;
   };
   if (typeof query !== "string" || !query.trim() || query.length > 500) {
     response
@@ -132,6 +190,12 @@ app.post("/api/search", async (request, response) => {
     return;
   }
   const session = getSession(request, response);
+  if (source === "supabase" && !session.connection) {
+    response.status(409).json({
+      error: "Your local connection expired. Connect to Supabase again.",
+    });
+    return;
+  }
   if (version !== session.dataset.version) {
     response
       .status(409)
@@ -147,9 +211,18 @@ app.post("/api/search", async (request, response) => {
   session.busy = true;
   const start = performance.now();
   try {
+    if (session.connection)
+      session.dataset = {
+        ...(await readSupabase(session.connection)),
+        version: session.dataset.version,
+      };
     let results: Judgment[];
     let cached = 0;
-    if (live) {
+    if (live && postgresEnabled()) {
+      const judged = await searchPostgres(session.dataset.rows, query.trim());
+      results = judged.results;
+      cached = judged.cached;
+    } else if (live) {
       const judgments = await session.judge.search(
         session.dataset.rows,
         query.trim(),
@@ -168,6 +241,7 @@ app.post("/api/search", async (request, response) => {
       }
     }
     response.json({
+      dataset: session.connection ? publicDataset(session.dataset) : undefined,
       results: results.map(({ row, probability }) => ({ row, probability })),
       elapsed: Number((performance.now() - start).toFixed(1)),
       evaluated: session.dataset.rows.length,

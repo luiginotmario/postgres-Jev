@@ -90,7 +90,9 @@ test("native batches preserve row mapping even when answers arrive out of order"
   const results = await judge.search(rows, "query");
   assert.equal(calls, 3);
   assert.ok(
-    results.every((result) => result.probability === result.row.id / 300),
+    results.every(
+      (result) => result.probability === Number(result.row.id) / 300,
+    ),
   );
   const cached = await judge.search(rows, "query");
   assert.ok(cached.every((result) => result.cached));
