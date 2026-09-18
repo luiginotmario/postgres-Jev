@@ -6,6 +6,7 @@ export interface DataRow {
 }
 
 export interface Dataset {
+  token?: string;
   kind: DatasetKind;
   title: string;
   columns: { key: string; label: string }[];

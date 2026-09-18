@@ -71,7 +71,11 @@ export function App() {
     setError("");
     try {
       setResult(
-        await api<SearchResult>("search", { query, version: dataset.version }),
+        await api<SearchResult>("search", {
+          query,
+          version: dataset.version,
+          datasetToken: dataset.token,
+        }),
       );
       setPage(0);
     } catch (error) {
@@ -86,7 +90,9 @@ export function App() {
     setBusy("generate");
     setError("");
     try {
-      setDataset(await api<Dataset>("generate", {}));
+      setDataset(
+        await api<Dataset>("generate", { datasetToken: dataset?.token }),
+      );
       setQuery("");
       setResult(null);
       setPage(0);
@@ -122,7 +128,7 @@ export function App() {
       </header>
       <form
         onSubmit={search}
-        className="mb-6 flex items-center gap-3 rounded-lg border border-sage-300 bg-white p-3 pl-4 shadow-xs focus-within:border-sage-500 sm:pl-5"
+        className="mb-3 flex items-center gap-3 rounded-lg border border-sage-300 bg-white p-3 pl-4 shadow-xs focus-within:border-sage-500 sm:pl-5"
       >
         <Search
           size={17}
@@ -169,6 +175,25 @@ export function App() {
           )}
         </button>
       </form>
+
+      {dataset && (
+        <div className="mb-6 flex flex-wrap items-baseline justify-between gap-2 px-1 text-xs text-sage-500">
+          <code
+            className="min-w-0 break-words leading-relaxed"
+            aria-label="Jev query"
+          >
+            <span className="text-sage-700">jev</span>
+            {"(" +
+              dataset.kind +
+              ", " +
+              JSON.stringify(query.trim() || dataset.examples[0]) +
+              ")"}
+          </code>
+          <span className="shrink-0 text-[11px]">
+            {dataset.live ? "Jev Latest · noul" : "Demo"}
+          </span>
+        </div>
+      )}
 
       {error && (
         <div

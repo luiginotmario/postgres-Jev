@@ -7,13 +7,16 @@ import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createServer, type Manifest } from "vite";
-import { generateDataset, nextDataset, scoreDemo } from "./datasets";
-import { renderDocument } from "./document";
-import { createJudge } from "./jev";
-import type { Dataset, Judgment } from "../src/types";
+import type { Manifest } from "vite";
+import { datasetTokens } from "./dataset-token.js";
+import { generateDataset, nextDataset, scoreDemo } from "./datasets.js";
+import { renderDocument } from "./document.js";
+import { createJudge } from "./jev.js";
+import type { Dataset, Judgment } from "../src/types.js";
 
-const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const root = process.env.VERCEL
+  ? process.cwd()
+  : path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 if (existsSync(path.join(root, ".env")))
   process.loadEnvFile(path.join(root, ".env"));
 const port = Number(process.env.PORT || 4317);
@@ -23,8 +26,14 @@ const allowedOrigins = [
   `http://localhost:${port}`,
   `http://127.0.0.1:${port}`,
   ...(publicUrl ? [new URL(publicUrl).origin] : []),
+  ...[process.env.VERCEL_URL, process.env.VERCEL_PROJECT_PRODUCTION_URL]
+    .filter(Boolean)
+    .map((host) => `https://${host}`),
 ];
 const app = express();
+const tokens = datasetTokens(
+  process.env.OPENROUTER_API_KEY || randomBytes(32).toString("hex"),
+);
 
 interface Session {
   expires: number;
@@ -36,7 +45,7 @@ interface Session {
 const sessions = new Map<string, Session>();
 const sessionLifetime = 3600000;
 app.disable("x-powered-by");
-app.use(express.json({ limit: "8kb" }));
+app.use(express.json({ limit: "64kb" }));
 app.use("/api", (request, response, next) => {
   response.set("Cache-Control", "no-store");
   if (
@@ -56,8 +65,14 @@ function getSession(request: Request, response: Response): Session {
   const token = request.headers.cookie?.match(
     /(?:^|; )jev_session=([a-f0-9]{48})(?:;|$)/,
   )?.[1];
+  const supplied = request.body?.datasetToken;
+  const restored = supplied ? tokens.decode(supplied) : undefined;
   const existing = token ? sessions.get(token) : undefined;
-  if (existing && existing.expires > Date.now()) {
+  if (
+    existing &&
+    existing.expires > Date.now() &&
+    (!restored || restored.version === existing.dataset.version)
+  ) {
     existing.expires = Date.now() + sessionLifetime;
     return existing;
   }
@@ -69,7 +84,7 @@ function getSession(request: Request, response: Response): Session {
   const session: Session = {
     expires: Date.now() + sessionLifetime,
     busy: false,
-    dataset: generateDataset("people", live),
+    dataset: restored ? { ...restored, live } : generateDataset("people", live),
     judge: createJudge({
       apiKey: process.env.OPENROUTER_API_KEY,
       model: process.env.OPENROUTER_MODEL || "~typesafe/jev-latest",
@@ -78,7 +93,9 @@ function getSession(request: Request, response: Response): Session {
   sessions.set(id, session);
   response.cookie("jev_session", id, {
     httpOnly: true,
-    secure: publicUrl?.startsWith("https://") ?? false,
+    secure:
+      Boolean(process.env.VERCEL) ||
+      (publicUrl?.startsWith("https://") ?? false),
     sameSite: "strict",
     maxAge: sessionLifetime,
   });
@@ -86,7 +103,8 @@ function getSession(request: Request, response: Response): Session {
 }
 
 app.get("/api/dataset", (request, response) => {
-  response.json(getSession(request, response).dataset);
+  const dataset = getSession(request, response).dataset;
+  response.json({ ...dataset, token: tokens.encode(dataset) });
 });
 
 app.post("/api/generate", (request, response) => {
@@ -99,7 +117,7 @@ app.post("/api/generate", (request, response) => {
   }
   session.dataset = nextDataset(session.dataset.kind, live);
   session.judge.clear();
-  response.json(session.dataset);
+  response.json({ ...session.dataset, token: tokens.encode(session.dataset) });
 });
 
 app.post("/api/search", async (request, response) => {
@@ -174,7 +192,7 @@ app.use("/api", (_request, response) => {
   response.status(404).json({ error: "Endpoint not found." });
 });
 
-if (process.env.NODE_ENV === "production") {
+if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
   const manifest = JSON.parse(
     readFileSync(path.join(root, "dist/.vite/manifest.json"), "utf8"),
   ) as Manifest;
@@ -189,6 +207,7 @@ if (process.env.NODE_ENV === "production") {
     );
   });
 } else {
+  const { createServer } = await import("vite");
   const vite = await createServer({
     root,
     server: { middlewareMode: true },
@@ -202,9 +221,13 @@ if (process.env.NODE_ENV === "production") {
   app.use(vite.middlewares);
 }
 
-const server = app.listen(port, process.env.RENDER ? "0.0.0.0" : "127.0.0.1");
-server.on("listening", () => console.log(`http://localhost:${port}`));
-server.on("error", (error) => {
-  console.error(error.message);
-  process.exit(1);
-});
+export default app;
+
+if (!process.env.VERCEL) {
+  const server = app.listen(port, process.env.RENDER ? "0.0.0.0" : "127.0.0.1");
+  server.on("listening", () => console.log(`http://localhost:${port}`));
+  server.on("error", (error) => {
+    console.error(error.message);
+    process.exit(1);
+  });
+}

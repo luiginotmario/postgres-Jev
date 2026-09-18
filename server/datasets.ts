@@ -1,5 +1,5 @@
 import { randomInt, randomUUID } from "node:crypto";
-import type { DataRow, Dataset, DatasetKind, Judgment } from "../src/types";
+import type { DataRow, Dataset, DatasetKind, Judgment } from "../src/types.js";
 
 const pick = <T>(values: readonly T[]): T => values[randomInt(values.length)];
 const shuffle = <T>(values: readonly T[]): T[] => {

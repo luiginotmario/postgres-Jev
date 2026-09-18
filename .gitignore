@@ -6,3 +6,7 @@ dist/
 test-results/
 playwright-report/
 __pycache__/
+
+.vercel/
+.vercel
+server/document.js

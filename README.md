@@ -22,11 +22,11 @@ npm run dev
 
 Open http://localhost:4317.
 
-`Generate random database` switches between fictional people, curated country samples, and synthetic sensor measurements. Generation runs directly in TypeScript. Datasets stay in local session memory for one hour.
+`Generate random database` switches between fictional people, curated country samples, and synthetic sensor measurements. Generation runs directly in TypeScript. Datasets are signed with a one-hour expiry and sent back with searches, so they survive serverless instance changes.
 
 ## Search
 
-Set `OPENROUTER_API_KEY` in `.env` and restart for arbitrary natural-language queries using Jev Latest through OpenRouter (`~typesafe/jev-latest`). The adapter uses OpenRouter’s [native Decisions API](https://openrouter.ai/openapi.json), preserving Jev’s typed probability output. Set `OPENROUTER_MODEL` to pin a specific version if needed. Keys stay server-side. Requests evaluate rows independently with eight concurrent workers, retry rate limits twice, and cache successful probabilities by record contents, question, model, and instructions. Results use a 70% cutoff.
+Set `OPENROUTER_API_KEY` in `.env` and restart for arbitrary natural-language queries using Jev Latest through OpenRouter (`~typesafe/jev-latest`). The adapter uses OpenRouter’s [native Decisions API](https://openrouter.ai/openapi.json), preserving Jev’s typed probability output. Set `OPENROUTER_MODEL` to pin a specific version if needed. Keys stay server-side. Requests evaluate rows independently with eight concurrent workers, retry rate limits twice, and cache successful probabilities by record contents, question, model, and instructions. Caches are held in instance memory and can reset on Vercel cold starts or instance changes. Results use a 70% cutoff.
 
 Without a key, the UI displays `Demo`. Only offline example rules work. The input placeholder shows a supported question, and unsupported questions explain the limitation. These scores are not model predictions.
 
@@ -56,3 +56,7 @@ The build includes strict TypeScript checks. Tests cover generated schemas, data
 ## Render
 
 Use `npm ci && npm run build` as the build command and `npm start` as the start command. Set `OPENROUTER_API_KEY` in the service environment; keep it out of source control. `OPENROUTER_MODEL` defaults to `~typesafe/jev-latest`.
+
+## Vercel
+
+Deploy with `vercel --prod`. The `api/index.ts` function serves the Express API and TSX-rendered page; Vite assets are served statically. Set `OPENROUTER_API_KEY` as a sensitive production environment variable and `OPENROUTER_MODEL` to `~typesafe/jev-latest`. Deployment hostnames are allowed automatically; use `APP_ORIGIN` for a custom domain. `.vercelignore` excludes local environment files from uploads.
