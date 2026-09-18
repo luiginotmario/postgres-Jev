@@ -4,7 +4,7 @@ import { createJudge, parseProbability } from "../server/jev";
 
 const response = (probability = 0.9) =>
   new Response(
-    JSON.stringify({ answers: { match: { type: "noul", noul: probability } } }),
+    JSON.stringify({ answers: { row_0: { type: "noul", noul: probability } } }),
     { headers: { "Content-Type": "application/json" } },
   );
 
@@ -22,11 +22,12 @@ test("uses OpenRouter Decisions with Jev Latest and typed questions", async () =
       const body = JSON.parse(String(options?.body));
       assert.equal(body.model, "~typesafe/jev-latest");
       assert.deepEqual(body.state, {
-        record: row,
         query: "could work from home",
       });
-      assert.equal(body.questions.match.type, "noul");
-      assert.equal(typeof body.questions.match.instructions, "string");
+      assert.equal(body.questions.row_0.type, "noul");
+      assert.ok(
+        body.questions.row_0.instructions.endsWith(JSON.stringify(row)),
+      );
       return response(0.95);
     },
   });
@@ -64,30 +65,50 @@ test("cache includes record contents and question", async () => {
   assert.equal(calls, 3);
 });
 
-test("concurrency is bounded and rows retain their probabilities", async () => {
-  let active = 0;
-  let peak = 0;
+test("native batches preserve row mapping even when answers arrive out of order", async () => {
+  let calls = 0;
   const judge = createJudge({
     apiKey: "test",
     fetcher: async (_url, options) => {
-      active++;
-      peak = Math.max(peak, active);
-      const body = JSON.parse(String(options?.body)) as {
-        state: { record: { id: number } };
-      };
-      await new Promise((resolve) => setTimeout(resolve, 2));
-      active--;
-      return response(body.state.record.id / 20);
+      calls++;
+      const body = JSON.parse(String(options?.body));
+      const keys = Object.keys(body.questions).reverse();
+      assert.ok(keys.length <= 128);
+      return new Response(
+        JSON.stringify({
+          answers: Object.fromEntries(
+            keys.map((key) => [
+              key,
+              { type: "noul", noul: Number(key.slice(4)) / 300 },
+            ]),
+          ),
+        }),
+      );
     },
   });
-  const results = await judge.search(
-    Array.from({ length: 20 }, (_, id) => ({ id })),
-    "query",
-  );
-  assert.equal(peak, 8);
+  const rows = Array.from({ length: 300 }, (_, id) => ({ id }));
+  const results = await judge.search(rows, "query");
+  assert.equal(calls, 3);
   assert.ok(
-    results.every((result) => result.probability === result.row.id / 20),
+    results.every((result) => result.probability === result.row.id / 300),
   );
+  const cached = await judge.search(rows, "query");
+  assert.ok(cached.every((result) => result.cached));
+  assert.equal(calls, 3);
+});
+
+test("one missing batch answer rejects the search and does not cache partial results", async () => {
+  let calls = 0;
+  const judge = createJudge({
+    apiKey: "test",
+    fetcher: async () => {
+      calls++;
+      return response();
+    },
+  });
+  await assert.rejects(() => judge.search([{ id: 1 }, { id: 2 }], "q"));
+  await judge.search([{ id: 1 }], "q");
+  assert.equal(calls, 2);
 });
 
 test("rate limits retry, authentication errors fail immediately", async () => {

@@ -26,7 +26,7 @@ Open http://localhost:4317.
 
 ## Search
 
-Set `OPENROUTER_API_KEY` in `.env` and restart for arbitrary natural-language queries using Jev Latest through OpenRouter (`~typesafe/jev-latest`). The adapter uses OpenRouter’s [native Decisions API](https://openrouter.ai/openapi.json), preserving Jev’s typed probability output. Set `OPENROUTER_MODEL` to pin a specific version if needed. Keys stay server-side. Requests evaluate rows independently with eight concurrent workers, retry rate limits twice, and cache successful probabilities by record contents, question, model, and instructions. Caches are held in instance memory and can reset on Vercel cold starts or instance changes. Results use a 70% cutoff.
+Set `OPENROUTER_API_KEY` in `.env` and restart for arbitrary natural-language queries using Jev Latest through OpenRouter (`~typesafe/jev-latest`). The adapter uses OpenRouter’s [native Decisions API](https://openrouter.ai/openapi.json), preserving Jev’s typed probability output. Set `OPENROUTER_MODEL` to pin a specific version if needed. Keys stay server-side. Rows are submitted as independent `noul` questions in native Jev batches (up to 128 questions and 96 KB of question text per call, with at most four calls in flight). Each question contains only its own record; the query is shared state. Requests retry rate limits twice and cache successful probabilities by record contents, question, model, and instructions. Caches are held in instance memory and can reset on Vercel cold starts or instance changes. Results use a 70% cutoff.
 
 Without a key, the UI displays `Demo`. Only offline example rules work. The input placeholder shows a supported question, and unsupported questions explain the limitation. These scores are not model predictions.
 
