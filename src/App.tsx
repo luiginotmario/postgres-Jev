@@ -12,8 +12,15 @@ import { api } from "./api";
 import type { DataRow, Dataset, SearchResult } from "./types";
 
 const pageSize = 10;
+const avatarColors = [
+  "bg-sage-100 text-sage-600",
+  "bg-[#f2ebe2] text-[#8e7761]",
+  "bg-[#e7eef0] text-[#71878f]",
+  "bg-[#eee8f0] text-[#8b7599]",
+  "bg-[#efeae6] text-[#8c7769]",
+];
 const iconButton =
-  "flex size-8 items-center justify-center rounded-md text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 disabled:opacity-25";
+  "flex size-8 items-center justify-center rounded-md text-sage-400 hover:bg-sage-100 hover:text-sage-700 disabled:opacity-25";
 
 function displayValue(row: DataRow, column: string): string {
   if (column === "temperature_c") return `${row[column]}°C`;
@@ -99,14 +106,27 @@ export function App() {
   const pages = Math.max(1, Math.ceil(rows.length / pageSize));
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 sm:px-8 sm:py-16">
+    <main className="mx-auto max-w-6xl px-4 pb-10 pt-12 sm:px-8 sm:pt-16">
+      <header className="mb-9 text-center sm:mb-12">
+        <h1 className="font-display text-[52px] leading-[1.02] font-normal tracking-[-1.5px] text-sage-900 sm:text-[68px] sm:tracking-[-2px]">
+          Skip the syntax.
+          <br />
+          <em className="font-normal text-sage-500">Ask your database.</em>
+        </h1>
+        <p className="mt-5 text-xs leading-7 text-sage-600 sm:text-sm">
+          Search by what you mean. No embeddings, no index.
+          <br />
+          Just a table, a question, and{" "}
+          <code className="text-xs text-sage-700">jev()</code>.
+        </p>
+      </header>
       <form
         onSubmit={search}
-        className="mb-6 flex items-center gap-3 rounded-lg border border-neutral-200 bg-white p-2 pl-4 shadow-xs focus-within:border-neutral-400"
+        className="mb-6 flex items-center gap-3 rounded-lg border border-sage-300 bg-white p-3 pl-4 shadow-xs focus-within:border-sage-500 sm:pl-5"
       >
         <Search
           size={17}
-          className="shrink-0 text-neutral-400"
+          className="shrink-0 text-sage-400"
           aria-hidden="true"
         />
         <input
@@ -120,7 +140,7 @@ export function App() {
               ? `Search ${dataset.title.toLowerCase()}… e.g. ${dataset.examples[0].toLowerCase()}`
               : "Search records…"
           }
-          className="min-w-0 flex-1 bg-transparent py-2 text-base text-neutral-800 outline-none! placeholder:text-neutral-400 sm:text-sm"
+          className="min-w-0 flex-1 bg-transparent py-2 text-base text-sage-800 outline-none! placeholder:text-sage-400 sm:text-sm"
         />
         {query && (
           <button
@@ -137,7 +157,7 @@ export function App() {
           type="submit"
           aria-label="Search"
           disabled={!!busy || !dataset || !query.trim()}
-          className="flex size-9 shrink-0 items-center justify-center rounded-md bg-neutral-800 text-white transition-colors hover:bg-neutral-700 active:scale-[.97] disabled:opacity-30 motion-reduce:transform-none"
+          className="flex size-9 shrink-0 items-center justify-center rounded-md bg-sage-800 text-white transition-colors hover:bg-sage-700 active:scale-[.97] disabled:opacity-30 motion-reduce:transform-none"
         >
           {busy === "search" ? (
             <LoaderCircle
@@ -169,28 +189,28 @@ export function App() {
       <section
         aria-label="Records"
         aria-busy={!!busy}
-        className="overflow-hidden rounded-lg border border-neutral-200"
+        className="overflow-hidden rounded-lg border border-sage-200 bg-white"
       >
-        <div className="flex min-h-11 items-center justify-between gap-3 border-b border-neutral-200 px-4 text-xs">
+        <div className="flex min-h-11 items-center justify-between gap-3 border-b border-sage-200 bg-sage-50/50 px-4 text-xs">
           <div className="flex items-center gap-2">
-            <span className="font-medium text-neutral-600">
+            <span className="font-medium text-sage-600">
               {dataset?.title ?? "Loading…"}
             </span>
-            <span className="text-neutral-400">
+            <span className="text-sage-400">
               {rows.length} {result ? "matches" : "rows"}
             </span>
             {result && (
               <button
                 onClick={clearSearch}
                 disabled={!!busy}
-                className="ml-1 text-neutral-500 underline underline-offset-2"
+                className="ml-1 text-sage-500 underline underline-offset-2"
               >
                 Reset
               </button>
             )}
           </div>
           <span
-            className="text-[11px] text-neutral-400"
+            className="text-[11px] text-sage-400"
             title={
               dataset?.live
                 ? "Live model judgments"
@@ -203,7 +223,7 @@ export function App() {
         </div>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left text-xs">
-            <thead className="bg-neutral-50 text-neutral-500">
+            <thead className="bg-sage-50 text-sage-500">
               <tr>
                 {dataset?.columns.map((column) => (
                   <th
@@ -216,15 +236,48 @@ export function App() {
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100">
+            <tbody className="divide-y divide-sage-100">
               {rows.slice(page * pageSize, (page + 1) * pageSize).map((row) => (
-                <tr key={row.id} className="hover:bg-neutral-50/70">
+                <tr key={row.id} className="hover:bg-sage-50/70">
                   {dataset?.columns.map((column, index) => (
                     <td
                       key={column.key}
-                      className={`px-4 py-3.5 leading-relaxed ${index === 0 ? "font-medium text-neutral-800" : "text-neutral-500"} ${column.key === "description" ? "min-w-64 max-w-sm" : "whitespace-nowrap"}`}
+                      className={`px-4 py-3.5 leading-relaxed ${index === 0 ? "font-medium text-sage-800" : "text-sage-500"} ${column.key === "description" ? "min-w-64 max-w-sm" : "whitespace-nowrap"}`}
                     >
-                      {displayValue(row, column.key)}
+                      {column.key === "name" ? (
+                        <span className="inline-flex items-center gap-2.5">
+                          <span
+                            aria-hidden="true"
+                            className={
+                              "inline-flex size-7 shrink-0 items-center justify-center rounded-full text-[9px] font-normal " +
+                              avatarColors[row.id % avatarColors.length]
+                            }
+                          >
+                            {String(row.name)
+                              .split(" ")
+                              .map((part) => part[0])
+                              .join("")}
+                          </span>
+                          {displayValue(row, column.key)}
+                        </span>
+                      ) : column.key === "work_mode" ||
+                        column.key === "status" ? (
+                        <span
+                          className={
+                            "inline-flex items-center gap-1.5 rounded border px-1.5 py-0.5 text-[10px] " +
+                            (["Remote", "Online"].includes(
+                              String(row[column.key]),
+                            )
+                              ? "border-sage-200 bg-sage-100 text-sage-700"
+                              : "border-sage-100 bg-sage-50 text-sage-600")
+                          }
+                        >
+                          <span className="size-1 rounded-full bg-current opacity-60" />
+                          {displayValue(row, column.key)}
+                        </span>
+                      ) : (
+                        displayValue(row, column.key)
+                      )}
                     </td>
                   ))}
                 </tr>
@@ -233,7 +286,7 @@ export function App() {
                 <tr>
                   <td
                     colSpan={dataset?.columns.length ?? 1}
-                    className="h-40 px-4 text-center text-neutral-400"
+                    className="h-40 px-4 text-center text-sage-400"
                   >
                     {dataset ? "No matching records." : "Loading records…"}
                   </td>
@@ -242,7 +295,7 @@ export function App() {
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between border-t border-neutral-200 px-3 py-2 text-[11px] tabular-nums text-neutral-400">
+        <div className="flex items-center justify-between border-t border-sage-200 px-3 py-2 text-[11px] tabular-nums text-sage-400">
           <span>
             {rows.length ? page * pageSize + 1 : 0}–
             {Math.min((page + 1) * pageSize, rows.length)} of {rows.length}
@@ -273,7 +326,7 @@ export function App() {
       <button
         onClick={generate}
         disabled={!!busy || !dataset}
-        className="mt-4 inline-flex items-center gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 text-xs text-neutral-600 transition-colors hover:bg-neutral-50 active:scale-[.98] disabled:opacity-40 motion-reduce:transform-none"
+        className="mt-4 inline-flex items-center gap-2 rounded-md border border-sage-200 bg-white px-3 py-2 text-xs text-sage-600 transition-colors hover:bg-sage-50 active:scale-[.98] disabled:opacity-40 motion-reduce:transform-none"
       >
         {busy === "generate" ? (
           <LoaderCircle
