@@ -1,6 +1,0 @@
-comment = 'Natural-language predicates powered by TypeSafe Jev'
-default_version = '0.1.0'
-requires = 'plpython3u'
-relocatable = false
-schema = public
-superuser = true
